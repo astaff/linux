@@ -215,6 +215,10 @@ impl Registry {
             qos_ids: QosIds::new()?,
             admission: {
                 let admission = admission::Pool::with_waiters(kick::queue_limit(variant.qid_floor), queues, renders)?;
+                if variant.is_25f84() && crate::module_parameters::t6041_serial_render.value() != 0 {
+                    admission.serialize_render();
+                    pr_warn!("T6041 25F84: serial render admission enabled (one outstanding render lease)\n");
+                }
                 admission
             },
             render: render::RenderState::new(clusters, deflake, descriptor_flags)?,
