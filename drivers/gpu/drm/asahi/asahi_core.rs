@@ -216,5 +216,9 @@ module! {
             default: 1,
             description: "G16: validate CDM/VDM stream records",
         },
+        t6041_fw_log: u32 {
+            default: 0,
+            description: "T6041 bring-up: enable the firmware's log at boot (main configuration +0x250 = 1, status A debug flags 3)",
+        },
     },
 }
