@@ -60,7 +60,13 @@ pub(crate) const CONFIG: Config = Config {
                 0xa3, 0xc1, 0x83, 0xe8,
             ],
         }],
-        variant: &fw::variant::V25F84,
+        // Experimental TA-mode workaround: reported on another J616C/25G83
+        // implementation, not yet hardware-verified here on 25F84. Keep the
+        // shared firmware profiles (in particular M4 Pro's) unchanged.
+        variant: &fw::variant::Variant {
+            ta_mode_1: true,
+            ..fw::variant::V25F84
+        },
     }]),
     core_layout: CoreLayout {
         cores: Some((4, 40)),
