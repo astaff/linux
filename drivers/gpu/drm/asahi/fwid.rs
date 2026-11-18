@@ -476,8 +476,8 @@ mod tests {
         else {
             panic!("T6041 must identify its loaded firmware");
         };
-        assert_eq!(builds.len(), 3);
-        // The last two admit the 25G83 images, with the 40- and the 32-core configuration.
+        assert_eq!(builds.len(), 4);
+        // Builds 1 and 2 admit the 25G83 images, with the 40- and the 32-core configuration.
         assert_eq!(builds[1].images.len(), builds[2].images.len());
         for (a, b) in builds[1].images.iter().zip(builds[2].images) {
             assert_eq!((a.entropy, a.text_sha256), (b.entropy, b.text_sha256));
@@ -489,11 +489,29 @@ mod tests {
                 let found = measured(build.images, image.data_size, entropy, digest);
                 assert!(core::ptr::eq(found.unwrap(), image));
                 assert!(measured(other.images, image.data_size, entropy, digest).is_none());
+                assert!(measured(builds[3].images, image.data_size, entropy, digest).is_none());
                 assert!(measured(build.images, 0x13c000, entropy, digest).is_none());
             }
         }
-        // Only the 25G83 build runs its own configuration: the 25G83 register map, 40 cores.
+        for image in builds[3].images {
+            let digest = image.text_sha256;
+            let found = lookup(builds[3].images, image.text_size, image.data_size, |_| {
+                Some(digest)
+            });
+            assert!(core::ptr::eq(found.unwrap(), image));
+            assert!(
+                lookup(builds[0].images, image.text_size, image.data_size, |_| Some(digest))
+                    .is_none()
+            );
+            assert!(
+                lookup(builds[1].images, image.text_size, image.data_size, |_| Some(digest))
+                    .is_none()
+            );
+            assert!(lookup(builds[3].images, 0x60000, image.data_size, |_| Some(digest)).is_none());
+        }
+        // Only the 25G83 builds run their own configurations; 25F84 and 26B123 use BASE.
         assert!(builds[0].config.is_none());
+        assert!(builds[3].config.is_none());
         let g83 = builds[1].config.unwrap();
         let map = &crate::hw::t6041::REGISTER_WINDOWS_25G83;
         assert_eq!(g83.windows.len(), map.len());

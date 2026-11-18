@@ -72,7 +72,7 @@ pub(crate) const CONFIG: Config = Config {
 
 /// The 25G83 image is admitted twice, with the configuration of each measured core layout;
 /// the one that matches the probed cores is used.
-const BUILDS: [fw::variant::Build; 3] = [
+const BUILDS: [fw::variant::Build; 4] = [
     BUILD_25F84,
     fw::variant::Build {
         config: Some(&CONFIG_25G83),
@@ -83,7 +83,30 @@ const BUILDS: [fw::variant::Build; 3] = [
         config: Some(&super::t6041_25g83::CONFIG),
         ..BUILD_25G83
     },
+    BUILD_26B123,
 ];
+
+const BUILD_26B123: fw::variant::Build = fw::variant::Build {
+    os_version: [27, 2, 0],
+    name: "macOS 27.2 (26B123, iBoot mBoot-20457.41.3)",
+    images: &[crate::fwid::FirmwareBuild {
+        name: "Apple GFX 26B123 for T6041 (normalized loaded image)",
+        text_size: 0x64000,
+        data_size: 0xcc000,
+        entropy: &[[0x5d88c, 0x5d96f]],
+        boot_filled: &[],
+        text_sha256: [
+            0xcc, 0x4c, 0xb8, 0x28, 0x54, 0x6d, 0x5e, 0xc6, 0x39, 0xfa, 0x14, 0xc1, 0xcc, 0x6c,
+            0xef, 0xc7, 0x27, 0x40, 0x40, 0xfd, 0xbd, 0x5c, 0xb5, 0xa6, 0xec, 0xc4, 0x38, 0xb0,
+            0x3c, 0x84, 0x90, 0x3b,
+        ],
+    }],
+    variant: &fw::variant::Variant {
+        ta_mode_1: true,
+        ..fw::variant::V26B123
+    },
+    config: None,
+};
 
 const BUILD_25F84: fw::variant::Build = fw::variant::Build {
     os_version: [26, 5, 2],
