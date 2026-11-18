@@ -108,6 +108,7 @@
 #include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/sizes.h>
+#include <linux/soc/apple/display.h>
 #include <linux/soc/apple/t8132.h>
 #include <linux/string.h>
 #include <linux/stringify.h>
@@ -2139,10 +2140,14 @@ static void __init gate_t6041_internal(void)
 	    !gate_marked(nodes[T6041_PIODMA]))
 		goto out;
 
-	/* The desktop IOMFB instance is written for the 26.6.2 firmware only. */
-	if (of_property_count_u32_elems(nodes[T6041_DCP], "apple,firmware-compat") != 3 ||
-	    of_property_read_u32_array(nodes[T6041_DCP], "apple,firmware-compat", version, 3) ||
-	    version[0] != 26 || version[1] != 6 || version[2] != 2)
+	/*
+	 * The desktop IOMFB instance is written for the 26.6.2 firmware; J616c
+	 * on macOS 27.2 (26B123) uses the firmware-27 internal panel backend.
+	 */
+	if (!apple_t6041_j616c_dcp_v27_2(nodes[T6041_DCP]) &&
+	    (of_property_count_u32_elems(nodes[T6041_DCP], "apple,firmware-compat") != 3 ||
+	     of_property_read_u32_array(nodes[T6041_DCP], "apple,firmware-compat", version, 3) ||
+	     version[0] != 26 || version[1] != 6 || version[2] != 2))
 		goto out;
 
 	nodes[T6041_DCP_DART] = gate_target(nodes[T6041_DCP], "iommus", "#iommu-cells",
@@ -2179,6 +2184,9 @@ static void __init gate_t6041_internal(void)
 	of_changeset_init(&t6041_gate);
 	for (i = 0; i < ARRAY_SIZE(t6041_enable) && !ret; i++)
 		ret = of_changeset_update_prop_string(&t6041_gate, nodes[t6041_enable[i]],
+						      "status", "okay");
+	if (!ret && gate_disabled(nodes[T6041_PIODMA]))
+		ret = of_changeset_update_prop_string(&t6041_gate, nodes[T6041_PIODMA],
 						      "status", "okay");
 	if (!ret)
 		ret = of_changeset_apply(&t6041_gate);
@@ -3248,7 +3256,8 @@ static int __init t6041_max_apply(unsigned int i, struct device_node *display)
  */
 static void __init gate_t6041_max_run(void)
 {
-	struct device_node *display;
+	struct device_node *display, *internal;
+	u32 compat[3];
 	unsigned int i;
 	int ret;
 
@@ -3267,6 +3276,27 @@ static void __init gate_t6041_max_run(void)
 		of_node_put(display);
 		return;
 	}
+	/*
+	 * T6041 external display processors support the desktop 26.x firmware
+	 * and the J616c 27.2 (26B123) firmware-27 profile; leave their chains
+	 * disabled on any other firmware-27 build.
+	 */
+	internal = of_find_node_by_path("dcp");
+	if (!internal)
+		internal = of_find_compatible_node(NULL, NULL, gate_soc->dcp_compat);
+	if (internal &&
+	    !apple_t6041_j616c_dcp_v27_2(internal) &&
+	    of_property_count_u32_elems(internal, "apple,firmware-compat") ==
+		    ARRAY_SIZE(compat) &&
+	    !of_property_read_u32_array(internal, "apple,firmware-compat",
+					compat, ARRAY_SIZE(compat)) &&
+	    compat[0] == 27) {
+		staged_info("firmware 27 internal display only, external displays left off\n");
+		of_node_put(internal);
+		of_node_put(display);
+		return;
+	}
+	of_node_put(internal);
 	for (i = 0; i < ARRAY_SIZE(t6041_max_stages); i++) {
 		const struct gate_staged *st = t6041_max_stage(i);
 		const char *dcp = st->nodes[st->nr - 1];

@@ -1233,6 +1233,82 @@ static void __init gate_t6041_max_no_display(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, of_count_phandle_with_args(display, "iommus", "#iommu-cells"), 1);
 }
 
+static void __init gt_max_set_j616c_machine(struct kunit *test)
+{
+	static const char * const machine_compat[] = {
+		"apple,j616c", "apple,t6041", "apple,arm-platform",
+	};
+	struct device_node *root = gt_node(test, "/");
+	struct property *prop = of_find_property(root, "compatible", NULL);
+	struct gate_test *t = test->priv;
+
+	if (prop)
+		KUNIT_ASSERT_EQ(test, of_changeset_remove_property(&t->cs, root, prop), 0);
+	KUNIT_ASSERT_EQ(test,
+			of_changeset_add_prop_string_array(&t->cs, root, "compatible",
+							   machine_compat,
+							   ARRAY_SIZE(machine_compat)),
+			0);
+}
+
+/* Unapproved firmware 27 adopts only the internal panel: external chains stay off. */
+static void __init gate_t6041_max_firmware27_internal_only(struct kunit *test)
+{
+	struct device_node *dcp = gt_node(test, "/dcp@402e00000");
+	struct gate_test *t = test->priv;
+	static const u32 compat[3] = { 27, 2, 0 };
+
+	gt_max_set_j616c_machine(test);
+	gt_max_fill(test, 0);
+	gt_max_fill(test, 1);
+	KUNIT_ASSERT_EQ(test,
+			of_changeset_add_prop_string(&t->cs, dcp, "apple,firmware-uuid",
+						     "71F140DC-F18D-31B3-9772-537A5CC8400D"),
+			0);
+	KUNIT_ASSERT_EQ(test,
+			of_changeset_add_prop_u32_array(&t->cs, dcp, "apple,firmware-version",
+							compat, ARRAY_SIZE(compat)),
+			0);
+	KUNIT_ASSERT_EQ(test,
+			of_changeset_add_prop_u32_array(&t->cs, dcp, "apple,firmware-compat",
+							compat, ARRAY_SIZE(compat)),
+			0);
+	gt_max_run(test);
+	gt_max_expect_chain(test, 0, false);
+	gt_max_expect_chain(test, 1, false);
+	gt_max_expect_display(test, 0);
+}
+
+/* J616c on macOS 27.2 (26B123) admits filled external HDMI and USB-C DP chains. */
+static void __init gate_t6041_max_j616c_v27_2(struct kunit *test)
+{
+	struct device_node *dcp = gt_node(test, "/dcp@402e00000");
+	struct gate_test *t = test->priv;
+	static const u32 compat[3] = { 27, 2, 0 };
+
+	gt_max_set_j616c_machine(test);
+	gt_max_fill(test, 0);
+	gt_max_fill(test, 1);
+	gt_max_fill(test, 2);
+	KUNIT_ASSERT_EQ(test,
+			of_changeset_add_prop_string(&t->cs, dcp, "apple,firmware-uuid",
+						     APPLE_J616C_DCP_26B123_UUID),
+			0);
+	KUNIT_ASSERT_EQ(test,
+			of_changeset_add_prop_u32_array(&t->cs, dcp, "apple,firmware-version",
+							compat, ARRAY_SIZE(compat)),
+			0);
+	KUNIT_ASSERT_EQ(test,
+			of_changeset_add_prop_u32_array(&t->cs, dcp, "apple,firmware-compat",
+							compat, ARRAY_SIZE(compat)),
+			0);
+	gt_max_run(test);
+	gt_max_expect_chain(test, 0, true);
+	gt_max_expect_chain(test, 1, true);
+	gt_max_expect_chain(test, 2, true);
+	gt_max_expect_display(test, BIT(0) | BIT(1) | BIT(2));
+}
+
 static struct kunit_case gate_t6041_max_cases[] __refdata = {
 	KUNIT_CASE(gate_t6041_max_enabled),
 	KUNIT_CASE(gate_t6041_max_no_memory),
@@ -1242,6 +1318,8 @@ static struct kunit_case gate_t6041_max_cases[] __refdata = {
 	KUNIT_CASE(gate_t6041_max_enabled_by_loader),
 	KUNIT_CASE(gate_t6041_max_missing_node),
 	KUNIT_CASE(gate_t6041_max_no_display),
+	KUNIT_CASE(gate_t6041_max_firmware27_internal_only),
+	KUNIT_CASE(gate_t6041_max_j616c_v27_2),
 	{}
 };
 
